@@ -43,6 +43,7 @@
   "Cache for the json content.")
 
 
+;; See https://openrouter.ai/docs/guides/overview/models
 (defcustom oi-json-uri "https://openrouter.ai/api/v1/models"
   "URI of the JSON file with model information."
   :type '(string)
@@ -140,22 +141,48 @@ MODEL-DATA is the alist returned by `oi--get-model-data'."
   (alist-get 'description model-data))
 
 
-(defun oi--get-model-capabilities (_model-data)
+(defun oi--get-model-capabilities (model-data)
   "Get the capabilities of the model from MODEL-DATA.
 
 MODEL-DATA is the alist returned by `oi--get-model-data'."
-  ;; TODO: Implement-me
   ;; Ex: :capabilities (media tool json url)
-  nil)
+  (let (capabilities
+        (supported-parameters (alist-get 'supported_parameters model-data))
+        (input_modalities
+         (alist-get 'input_modalities (alist-get 'architecture model-data))))
+
+    (when (seq-contains-p supported-parameters "reasoning" 'string=)
+      (push 'reasoning capabilities))
+
+    (when (or (seq-contains-p input_modalities "image" 'string=) (seq-contains-p input_modalities "video" 'string=))
+      (push 'media capabilities))
+
+    (when (seq-contains-p supported-parameters "tools" 'string=)
+      (push 'tool-use capabilities)
+      (push 'json capabilities))
+
+    capabilities))
 
 
 ;; mime-types
-(defun oi--get-model-mime-types (_model-data)
+(defun oi--get-model-mime-types (model-data)
   "Get the mime-types of the model from MODEL-DATA.
 
 MODEL-DATA is the alist returned by `oi--get-model-data'."
-  ;; TODO: Implement-me
-  nil)
+  (let (mime-types
+        (input_modalities
+         (alist-get 'input_modalities (alist-get 'architecture model-data))))
+
+    (when (seq-contains-p input_modalities "image" 'string=)
+      (push "image/jpeg" mime-types)
+      (push "image/png" mime-types)
+      (push "image/gif" mime-types))
+
+    (when (seq-contains-p input_modalities "video" 'string=)
+      (push "video/mp4" mime-types)
+      (push "video/mpeg" mime-types))
+
+    mime-types))
 
 
 ;; Returning the value in thousands because that seems to be what gptel expects
